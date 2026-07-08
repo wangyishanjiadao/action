@@ -10,20 +10,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 检出仓库代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. 使用专用的 Action 安装并设置 NDK
-      # 这里指定了常用的 r25b 版本（你可以根据需要换成其他版本，如 r26b、r27c等）
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
           ndk-version: r25b
 
-      # 3. 使用 CMake 进行交叉编译
-      # 此时可以直接使用 ${{ steps.setup-ndk.outputs.ndk-path }} 获取准确的 NDK 路径
       - name: Build with CMake
         run: |
           mkdir build && cd build
@@ -33,9 +28,10 @@ jobs:
             -DANDROID_PLATFORM=android-21
           make
 
-      # 4. 上传产物（注意：CMake 默认生成的二进制文件会在 build/ 目录下，而不是 libs/）
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: my-ndk-service
-          path: build/my_service
+          name: native-executables
+          path: |
+            build/my_post_fs
+            build/my_service
