@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1. 动态生成加密头文件（放置在根目录和 jni 目录，确保能被引用）
+      # 1. 动态生成加密头文件
       - name: Generate Encrypted Secrets
         run: |
           python3 - <<EOF
@@ -28,7 +28,6 @@ jobs:
               "LOGFILE": "/data/local/tmp/AutoInstallProtected.log"
           }
 
-          # 写入到根目录，方便 CMake 的 include_directories 识别
           with open("encrypted_secrets.h", "w") as f:
               f.write("// Auto-generated file. Do not edit.\n")
               for key, value in secrets.items():
