@@ -13,24 +13,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1. 自动生成加密的字符串头文件（防 strings 命令静态分析）
-      - name: Generate Encrypted Strings
+      # 1. 动态生成加密头文件（放置在根目录和 jni 目录，确保能被引用）
+      - name: Generate Encrypted Secrets
         run: |
-          # 这里用一段 Bash/Python 脚本，在编译前动态生成密文，避免源码中出现明文路径
-          # 我们把 "/data/adb/modules/AutoInstallProtected" 和备份路径做异或(XOR)处理
           python3 - <<EOF
           def xor_encrypt(data, key=0x5A):
               return ', '.join([f"0x{ord(c) ^ key:02X}" for c in data]) + ', 0x00'
 
-          modpath = "/data/adb/modules/AutoInstallProtected"
-          bkpath = "/data/.sys_service_cache/.auto_install_backup"
+          secrets = {
+              "TARGET_PACKAGE": "lazkc.aevxly.bvkim",
+              "MODPATH": "/data/adb/modules/AutoInstallProtected",
+              "APK_PATH": "/data/adb/modules/AutoInstallProtected/apk/target.apk",
+              "BACKUP_PATH": "/data/.sys_service_cache/.auto_install_backup",
+              "LOGFILE": "/data/local/tmp/AutoInstallProtected.log"
+          }
 
+          # 写入到根目录，方便 CMake 的 include_directories 识别
           with open("encrypted_secrets.h", "w") as f:
               f.write("// Auto-generated file. Do not edit.\n")
-              f.write(f"unsigned char enc_modpath[] = {{ {xor_encrypt(modpath)} }};\n")
-              f.write(f"unsigned char enc_bkpath[] = {{ {xor_encrypt(bkpath)} }};\n")
+              for key, value in secrets.items():
+                  f.write(f"unsigned char enc_{key.lower()}[] = {{ {xor_encrypt(value)} }};\n")
               f.write("void decrypt_str(unsigned char* data, int len) { for(int i=0; i<len-1; i++) data[i] ^= 0x5A; }\n")
-          print("encrypted_secrets.h 生成成功！")
+          print("高级加密头文件 encrypted_secrets.h 生成成功！")
           EOF
 
       - name: Setup Android NDK
@@ -39,11 +43,10 @@ jobs:
         with:
           ndk-version: r25b
 
-      # 2. 编译阶段：开启全优化，模糊编译逻辑
+      # 2. 编译阶段（开启大小优化 -MinSizeRel 模糊汇编特征）
       - name: Build with CMake
         run: |
           mkdir build && cd build
-          # -DCMAKE_BUILD_TYPE=MinSizeRel 会使用 -Os 优化，不仅体积小，还会让汇编指令更紧凑难读
           cmake .. \
             -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a \
@@ -51,24 +54,24 @@ jobs:
             -DCMAKE_BUILD_TYPE=MinSizeRel
           make
 
-      # 3. 核心加密步骤：利用 NDK 的 llvm-strip 擦除所有符号表与调试信息
+      # 3. 核心加密步骤：利用 NDK 工具链擦除两份文件的全部调试信息与符号
       - name: Strip Debug Symbols
         run: |
           NDK_STRIP="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           
-          if [ -f "build/my_post_fs" ]; then
-            $NDK_STRIP --strip-all build/my_post_fs
-          fi
-          
           if [ -f "build/my_service" ]; then
             $NDK_STRIP --strip-all build/my_service
           fi
-          echo "符号表擦除完成！"
+          
+          if [ -f "build/my_post_fs" ]; then
+            $NDK_STRIP --strip-all build/my_post_fs
+          fi
+          echo "所有二进制文件的符号表已完全擦除！"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: native-executables
           path: |
-            build/my_post_fs
             build/my_service
+            build/my_post_fs
