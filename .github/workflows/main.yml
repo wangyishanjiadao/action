@@ -1,0 +1,41 @@
+name: Android NDK CI
+
+# 触发条件：当推送到 main/master 分支，或者手动触发时运行
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 检出仓库代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 设置 Android NDK 环境
+      # GitHub 官方提供的 Ubuntu 环境默认自带了 NDK，我们只需要把它加到环境变量里
+      - name: Setup Android NDK
+        run: |
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk-bundle" >> $GITHUB_ENV
+          echo "${ANDROID_SDK_ROOT}/ndk-bundle" >> $GITHUB_PATH
+
+      # 3. 使用 ndk-build 进行交叉编译
+      - name: Build with CMake
+        run: |
+          mkdir build && cd build
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE=${ANDROID_SDK_ROOT}/ndk-bundle/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-21
+          make
+
+      # 4. 将编译好的二进制文件作为 Artifact（产物）上传保存
+      # 编译产物会默认生成在 libs/ 目录下
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-ndk-service
+          path: libs/
