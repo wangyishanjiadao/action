@@ -1,0 +1,13 @@
+# 构建产物
+build/
+*.o
+
+# 自动下载的 miniaudio.h（构建时下载）
+miniaudio.h
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
