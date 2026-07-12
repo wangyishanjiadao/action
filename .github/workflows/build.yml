@@ -12,31 +12,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 检出代码
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 配置 Android NDK
+      - name: Setup Android NDK
         run: |
-          # GitHub Actions ubuntu-latest 已预装 Android SDK
           if [ -z "$ANDROID_HOME" ]; then
             export ANDROID_HOME=/usr/local/lib/android/sdk
           fi
           echo "ANDROID_HOME=$ANDROID_HOME"
 
-          # 查找已安装的 NDK 版本
           NDK_VER=$(ls "$ANDROID_HOME/ndk/" 2>/dev/null | sort -V | tail -1)
 
           if [ -z "$NDK_VER" ]; then
-            echo "NDK 未安装，正在安装..."
+            echo "Installing NDK..."
             yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973"
             NDK_VER="27.0.12077973"
           fi
 
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VER" >> $GITHUB_ENV
-          echo "NDK 版本: $NDK_VER"
-          echo "NDK 路径: $ANDROID_HOME/ndk/$NDK_VER"
+          echo "NDK version: $NDK_VER"
+          echo "NDK path: $ANDROID_HOME/ndk/$NDK_VER"
 
-      - name: CMake 配置
+      - name: CMake Configure
         run: |
           cmake -B build \
             -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
@@ -44,15 +42,15 @@ jobs:
             -DANDROID_PLATFORM=android-28 \
             -DCMAKE_BUILD_TYPE=Release
 
-      - name: 编译
+      - name: Build
         run: cmake --build build -j$(nproc)
 
-      - name: 查看产物
+      - name: Inspect binary
         run: |
           file build/mp3player
           ls -lh build/mp3player
 
-      - name: 上传产物
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: mp3player-arm64-v8a

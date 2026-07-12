@@ -266,7 +266,7 @@ static void toggle_playback(void) {
         /* 恢复播放 — seek 到暂停位置再 start */
         ma_uint32 sample_rate = 44100;
         ma_sound_get_data_format(&g_sound, NULL, NULL, &sample_rate,
-                                 NULL, NULL);
+                                 NULL, 0);
         if (sample_rate == 0) sample_rate = 44100;
 
         ma_uint64 frame = (ma_uint64)(g_paused_position * sample_rate);
@@ -282,7 +282,7 @@ static void toggle_playback(void) {
 }
 
 /* ====================================================================
- * 时间格式化 (秒 → MM:SS)
+ * 时间格式化 (秒 -> MM:SS)
  * ==================================================================== */
 static void format_time(int seconds, char *buf, size_t bufsz) {
     int m = seconds / 60;
@@ -295,6 +295,7 @@ static void format_time(int seconds, char *buf, size_t bufsz) {
  *
  * 使用 \r 回车符原地刷新同一行。
  * 末尾追加空格以覆盖上一帧更长的残留字符。
+ * 使用 '#' / '-' 替代 UTF-8 方块字符，确保跨平台兼容。
  * ==================================================================== */
 static void draw_progress(float cur, float total) {
     if (total <= 0.0f) total = 1.0f;
@@ -309,9 +310,9 @@ static void draw_progress(float cur, float total) {
     char bar[PROGRESS_BAR_WIDTH + 1];
     int i;
     for (i = 0; i < filled; i++)
-        bar[i] = '█';
+        bar[i] = '#';
     for (; i < PROGRESS_BAR_WIDTH; i++)
-        bar[i] = '░';
+        bar[i] = '-';
     bar[PROGRESS_BAR_WIDTH] = '\0';
 
     char t_cur[16], t_tot[16];
@@ -357,9 +358,9 @@ static int play_file(const char *filepath) {
 
     /* 清屏并显示头部信息 */
     printf("\033[2J\033[H");
-    printf("▶ %s\n", fname);
-    printf("  [Vol- ×2: 暂停/继续]  [Vol+ ×2: 退出]"
-           "  [Space: 暂停]  [Q: 退出]\n");
+    printf("> %s\n", fname);
+    printf("  [Vol- x2: Pause/Play]  [Vol+ x2: Quit]"
+           "  [Space: Pause]  [Q: Quit]\n");
     printf("\033[?25l");   /* 隐藏光标 */
     fflush(stdout);
 
@@ -414,12 +415,12 @@ static int play_file(const char *filepath) {
     printf("\n\n");
 
     if (finished) {
-        printf("✅ 播放完毕。\n");
+        printf("Finished.\n");
     } else {
-        printf("⏹ 已停止。\n");
+        printf("Stopped.\n");
     }
 
-    printf("按 Enter 继续...\n");
+    printf("Press Enter to continue...\n");
     fflush(stdout);
 
     /* 等待 Enter（临时切回规范模式） */
@@ -437,7 +438,7 @@ static int play_file(const char *filepath) {
 static int scan_directory(char files[][MAX_FILENAME_LEN], int max) {
     DIR *d = opendir(".");
     if (!d) {
-        fprintf(stderr, "[ERR] 无法打开当前目录\n");
+        fprintf(stderr, "[ERR] Cannot open current directory\n");
         return 0;
     }
 
@@ -475,12 +476,12 @@ int main(int argc, char *argv[]) {
         int n = scan_directory(filelist, MAX_MP3_FILES);
 
         if (n == 0) {
-            printf("当前目录没有 .mp3 文件。\n");
-            printf("用法: %s [文件名.mp3]\n", argv[0]);
+            printf("No .mp3 files in current directory.\n");
+            printf("Usage: %s [file.mp3]\n", argv[0]);
             return 1;
         }
 
-        printf("找到 %d 个 MP3 文件:\n\n", n);
+        printf("Found %d MP3 file(s):\n\n", n);
         for (int i = 0; i < n; i++) {
             struct stat st;
             char sz[32] = "?";
@@ -494,9 +495,9 @@ int main(int argc, char *argv[]) {
             }
             printf("  %2d. %s  (%s)\n", i + 1, filelist[i], sz);
         }
-        printf("\n   0. 全部播放\n");
-        printf("   q. 退出\n\n");
-        printf("请选择: ");
+        printf("\n   0. Play all\n");
+        printf("   q. Quit\n\n");
+        printf("Select: ");
         fflush(stdout);
 
         char input[32];
@@ -511,23 +512,23 @@ int main(int argc, char *argv[]) {
 
         if (sel == 0) {
             /* 全部播放 */
-            printf("\n即将播放全部 %d 首...\n\n", n);
+            printf("\nPlaying all %d files...\n\n", n);
             for (int i = 0;
                  i < n && !g_terminate && !atomic_load(&g_exit_requested);
                  i++) {
-                printf("── %d/%d ──\n", i + 1, n);
+                printf("-- %d/%d --\n", i + 1, n);
                 terminal_raw_enable();
                 pthread_t tid;
                 pthread_create(&tid, NULL, input_thread, NULL);
                 pthread_detach(tid);
                 play_file(filelist[i]);
             }
-            printf("👋 再见！\n");
+            printf("Done!\n");
             return 0;
         }
 
         if (sel < 1 || sel > n) {
-            printf("选择无效。\n");
+            printf("Invalid selection.\n");
             return 1;
         }
         target = filelist[sel - 1];
@@ -536,7 +537,7 @@ int main(int argc, char *argv[]) {
     if (!target) return 0;
 
     if (access(target, F_OK) != 0) {
-        fprintf(stderr, "[ERR] 文件不存在: %s\n", target);
+        fprintf(stderr, "[ERR] File not found: %s\n", target);
         return 1;
     }
 

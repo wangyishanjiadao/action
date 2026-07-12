@@ -8,7 +8,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # 自动下载 miniaudio.h（单文件音频库）
 # =========================================================================
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/miniaudio.h")
-    message(STATUS "正在下载 miniaudio.h ...")
+    message(STATUS "Downloading miniaudio.h ...")
     file(DOWNLOAD
         "https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/miniaudio.h"
@@ -17,9 +17,9 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/miniaudio.h")
     )
     list(GET dl_status 0 dl_code)
     if(NOT dl_code EQUAL 0)
-        message(FATAL_ERROR "miniaudio.h 下载失败")
+        message(FATAL_ERROR "miniaudio.h download failed")
     endif()
-    message(STATUS "miniaudio.h 下载完成")
+    message(STATUS "miniaudio.h downloaded")
 endif()
 
 # =========================================================================
@@ -34,11 +34,11 @@ target_link_libraries(mp3player PRIVATE m)
 if(ANDROID)
     # pthread 已内置于 Android Bionic libc，无需额外链接
     # miniaudio 通过 dlopen 动态加载音频后端（AAudio / OpenSL ES）
-    message(STATUS "目标: Android ${ANDROID_ABI} API ${ANDROID_PLATFORM}")
+    message(STATUS "Target: Android ${ANDROID_ABI} API ${ANDROID_PLATFORM}")
 else()
     find_package(Threads REQUIRED)
     target_link_libraries(mp3player PRIVATE Threads::Threads)
-    message(STATUS "目标: ${CMAKE_SYSTEM_NAME}")
+    message(STATUS "Target: ${CMAKE_SYSTEM_NAME}")
 endif()
 
 # =========================================================================
